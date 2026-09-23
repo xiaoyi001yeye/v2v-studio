@@ -19,6 +19,7 @@ DEFAULT_REFERENCE_PROMPT = """严格参考视频1中的人物动作、动作顺�
 
 
 def run_generation(
+    api_key: str,
     mode_label: str,
     video_uri: str,
     image_uri: str,
@@ -33,7 +34,7 @@ def run_generation(
 
     try:
         progress(0.05, desc="检查配置")
-        client = SeedanceClient()
+        client = SeedanceClient(api_key=api_key)
 
         progress(0.10, desc="创建 Seedance 任务")
         task_id = client.create_task(
@@ -92,12 +93,17 @@ with gr.Blocks(title="V2V Studio") as demo:
 
 本地 Gradio 界面的 Seedance V2V 工具。第一版直接使用 **公开 HTTPS URL** 或 **Ark asset:// URI** 作为素材输入。
 
-> API Key 只从项目目录下的 `.env` 读取，不会显示在页面，也不会提交到 GitHub。
+> API Key 可直接在页面输入，仅在当前请求中使用；也可通过 `.env` / 环境变量作为可选默认值。
 """
     )
 
     with gr.Row():
         with gr.Column(scale=1):
+            api_key = gr.Textbox(
+                label="ARK API Key",
+                type="password",
+                placeholder="输入你的火山方舟 API Key",
+            )
             mode = gr.Radio(
                 ["视频编辑（保持原视频时长/比例）", "参考视频生成（动作/运镜参考）"],
                 value="视频编辑（保持原视频时长/比例）",
@@ -155,6 +161,7 @@ with gr.Blocks(title="V2V Studio") as demo:
     generate.click(
         fn=run_generation,
         inputs=[
+            api_key,
             mode,
             video_uri,
             image_uri,

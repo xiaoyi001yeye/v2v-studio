@@ -5,16 +5,13 @@
     "cpus": 2,
     "memory": "4gb"
   },
-  "forwardPorts": [7860],
+  "forwardPorts": [
+    7860
+  ],
   "portsAttributes": {
     "7860": {
       "label": "V2V Studio",
       "onAutoForward": "openBrowser"
-    }
-  },
-  "secrets": {
-    "ARK_API_KEY": {
-      "description": "Volcengine Ark API key used by V2V Studio"
     }
   },
   "remoteEnv": {

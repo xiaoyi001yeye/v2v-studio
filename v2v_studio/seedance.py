@@ -16,12 +16,17 @@ class SeedanceError(RuntimeError):
 
 
 class SeedanceClient:
-    def __init__(self) -> None:
-        settings.validate()
+    def __init__(self, api_key: str | None = None) -> None:
+        self.api_key = (api_key or settings.api_key or "").strip()
+        if not self.api_key:
+            raise SeedanceError("ARK API Key is required.")
+        if not settings.model:
+            raise SeedanceError("ARK model is not configured.")
+
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "Authorization": f"Bearer {settings.api_key}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
         )

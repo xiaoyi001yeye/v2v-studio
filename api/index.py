@@ -11,8 +11,8 @@ app = FastAPI(title="V2V Studio API")
 
 
 class CreateTaskRequest(BaseModel):
-    mode: Literal["edit", "reference"] = "edit"
-    video_uri: str = Field(min_length=1)
+    mode: Literal["text", "image", "edit", "reference"] = "text"
+    video_uri: str | None = None
     image_uri: str | None = None
     prompt: str = Field(min_length=1)
     ratio: str = "16:9"
@@ -23,7 +23,7 @@ class CreateTaskRequest(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "modes": ["text", "image", "edit", "reference"]}
 
 
 @app.post("/api/create")
@@ -35,9 +35,9 @@ def create_task(
         client = SeedanceClient(api_key=x_ark_api_key)
         task_id = client.create_task(
             prompt=body.prompt,
+            mode=body.mode,
             video_uri=body.video_uri,
             image_uri=body.image_uri,
-            mode=body.mode,
             ratio=body.ratio,
             duration=body.duration,
             generate_audio=body.generate_audio,
@@ -59,7 +59,11 @@ def get_status(
         client = SeedanceClient(api_key=x_ark_api_key)
         data = client.get_task(task_id)
         status = str(data.get("status", "unknown")).lower()
-        video_url = client.find_video_url(data) if status in {"succeeded", "success", "completed"} else None
+        video_url = (
+            client.find_video_url(data)
+            if status in {"succeeded", "success", "completed"}
+            else None
+        )
         return {
             "task_id": task_id,
             "status": status,

@@ -1,0 +1,40 @@
+{
+  "name": "V2V Studio",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb"
+  },
+  "forwardPorts": [7860],
+  "portsAttributes": {
+    "7860": {
+      "label": "V2V Studio",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "secrets": {
+    "ARK_API_KEY": {
+      "description": "Volcengine Ark API key used by V2V Studio"
+    }
+  },
+  "remoteEnv": {
+    "GRADIO_SERVER_NAME": "0.0.0.0",
+    "GRADIO_SERVER_PORT": "7860",
+    "GRADIO_INBROWSER": "false"
+  },
+  "postCreateCommand": "python -m venv .venv && .venv/bin/python -m pip install --upgrade pip && .venv/bin/pip install -r requirements.txt && mkdir -p data outputs logs",
+  "postAttachCommand": "bash .devcontainer/start-codespace.sh",
+  "customizations": {
+    "codespaces": {
+      "openFiles": [
+        "README.md",
+        "app.py"
+      ]
+    },
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ]
+    }
+  }
+}

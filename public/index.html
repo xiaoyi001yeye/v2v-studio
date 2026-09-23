@@ -14,7 +14,7 @@
     .card { background:#141821; border:1px solid #262c38; border-radius:16px; padding:20px; }
     label { display:block; margin:14px 0 7px; font-size:14px; color:#cbd2dc; }
     input, textarea, select { width:100%; box-sizing:border-box; background:#0d1118; color:#fff; border:1px solid #303746; border-radius:9px; padding:11px 12px; }
-    textarea { min-height:180px; resize:vertical; }
+    textarea { min-height:190px; resize:vertical; }
     .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .checks { display:flex; gap:24px; margin:16px 0; }
     .checks label { margin:0; display:flex; align-items:center; gap:8px; }
@@ -23,14 +23,15 @@
     button:disabled { opacity:.55; cursor:not-allowed; }
     #status { min-height:120px; white-space:pre-wrap; background:#0d1118; border-radius:10px; padding:14px; color:#aeb8c8; }
     video { width:100%; margin-top:16px; border-radius:12px; background:#000; min-height:280px; }
-    .hint { color:#7f8a9d; font-size:13px; margin-top:10px; }
+    .hint { color:#7f8a9d; font-size:13px; margin-top:8px; line-height:1.5; }
+    .hidden { display:none; }
     @media (max-width:800px){ .grid{grid-template-columns:1fr}.row{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>V2V Studio</h1>
-  <div class="sub">Seedance V2V · Vercel + FastAPI</div>
+  <div class="sub">Seedance Studio · 文生视频 / 图生视频 / 视频编辑 / 参考视频生成</div>
   <div class="grid">
     <section class="card">
       <label>ARK API Key</label>
@@ -39,34 +40,36 @@
 
       <label>生成模式</label>
       <select id="mode">
-        <option value="edit">视频编辑（保持原视频时长/比例）</option>
-        <option value="reference">参考视频生成（动作/运镜参考）</option>
+        <option value="text">文生视频 T2V</option>
+        <option value="image">图生视频 I2V</option>
+        <option value="edit">视频编辑 V2V（保持原视频时长/比例）</option>
+        <option value="reference">参考视频生成 R2V（动作/运镜参考）</option>
       </select>
 
-      <label>原视频 URL / Asset URI</label>
-      <input id="videoUri" placeholder="https://...mp4 或 asset://asset-xxxx">
+      <div id="videoRow" class="hidden">
+        <label>原视频 URL / Asset URI</label>
+        <input id="videoUri" placeholder="https://...mp4 或 asset://asset-xxxx">
+      </div>
 
-      <label>参考图片 URL / Asset URI（可选）</label>
-      <input id="imageUri" placeholder="https://...jpg 或 asset://asset-xxxx">
+      <div id="imageRow" class="hidden">
+        <label id="imageLabel">参考图片 URL / Asset URI</label>
+        <input id="imageUri" placeholder="https://...jpg 或 asset://asset-xxxx">
+      </div>
 
       <label>提示词</label>
-      <textarea id="prompt">这是视频编辑任务。
-
-请严格保持视频中的人物动作、镜头运动、构图、时序和节奏。
-仅执行我描述的修改，其他内容尽量保持不变。
-不要添加字幕，不要增加无关人物。</textarea>
+      <textarea id="prompt"></textarea>
 
       <div class="row">
         <div>
           <label>宽高比</label>
           <select id="ratio">
-            <option>adaptive</option><option>16:9</option><option>9:16</option>
-            <option>1:1</option><option>4:3</option><option>3:4</option>
+            <option>16:9</option><option>9:16</option><option>1:1</option>
+            <option>4:3</option><option>3:4</option><option>adaptive</option>
           </select>
         </div>
         <div>
           <label>时长（秒）</label>
-          <input id="duration" type="number" value="-1">
+          <input id="duration" type="number" min="1" max="30" value="10">
         </div>
       </div>
 
@@ -76,7 +79,7 @@
       </div>
 
       <button id="generate">开始生成</button>
-      <div class="hint">刷新或关闭页面后需要重新输入 API Key。</div>
+      <div class="hint">文生视频不需要原视频；视频编辑模式自动使用 adaptive / -1。</div>
     </section>
 
     <section class="card">
@@ -94,20 +97,31 @@ const prompt = document.getElementById("prompt");
 const button = document.getElementById("generate");
 const statusBox = document.getElementById("status");
 const result = document.getElementById("result");
+const videoRow = document.getElementById("videoRow");
+const imageRow = document.getElementById("imageRow");
+const imageLabel = document.getElementById("imageLabel");
 
-const editPrompt = prompt.value;
-const refPrompt = `严格参考视频1中的人物动作、动作顺序、节奏和镜头运动，重新生成一段新视频。
-如果提供了图片1，请保持图片1中主体的身份、外观和服装特征。`;
+const prompts = {
+  text: "一只银色未来感机器人在雨夜霓虹城市中奔跑，低机位跟拍，电影级灯光，镜头运动流畅，细节丰富。",
+  image: "以图片1为主体生成视频。保持主体身份、外观和服装特征稳定，让主体自然行走并看向镜头，电影感运镜，动作自然。",
+  edit: "这是视频编辑任务。\n\n请严格保持视频中的人物动作、镜头运动、构图、时序和节奏。\n仅执行我描述的修改，其他内容尽量保持不变。\n不要添加字幕，不要增加无关人物。",
+  reference: "严格参考视频1中的人物动作、动作顺序、节奏和镜头运动，重新生成一段新视频。\n如果提供了图片1，请保持图片1中主体的身份、外观和服装特征。"
+};
 
-mode.addEventListener("change", () => {
-  const editing = mode.value === "edit";
-  ratio.value = editing ? "adaptive" : "16:9";
-  duration.value = editing ? -1 : 10;
+function updateMode() {
+  const m = mode.value;
+  const editing = m === "edit";
+  videoRow.classList.toggle("hidden", !(m === "edit" || m === "reference"));
+  imageRow.classList.toggle("hidden", !(m === "image" || m === "reference"));
+  imageLabel.textContent = m === "image" ? "主体图片 URL / Asset URI" : "参考图片 URL / Asset URI（可选）";
   ratio.disabled = editing;
   duration.disabled = editing;
-  prompt.value = editing ? editPrompt : refPrompt;
-});
-mode.dispatchEvent(new Event("change"));
+  ratio.value = editing ? "adaptive" : "16:9";
+  duration.value = editing ? -1 : 10;
+  prompt.value = prompts[m];
+}
+mode.addEventListener("change", updateMode);
+updateMode();
 
 function setStatus(text) { statusBox.textContent = text; }
 
@@ -149,7 +163,7 @@ button.addEventListener("click", async () => {
     setStatus("正在创建 Seedance 任务...");
     const payload = {
       mode: mode.value,
-      video_uri: document.getElementById("videoUri").value.trim(),
+      video_uri: document.getElementById("videoUri").value.trim() || null,
       image_uri: document.getElementById("imageUri").value.trim() || null,
       prompt: prompt.value.trim(),
       ratio: ratio.value,

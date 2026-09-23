@@ -33,6 +33,10 @@
   <div class="sub">Seedance V2V · Vercel + FastAPI</div>
   <div class="grid">
     <section class="card">
+      <label>ARK API Key</label>
+      <input id="apiKey" type="password" autocomplete="off" placeholder="输入你的火山方舟 API Key">
+      <div class="hint">仅用于当前页面请求，不写入服务器文件、数据库或浏览器持久存储。</div>
+
       <label>生成模式</label>
       <select id="mode">
         <option value="edit">视频编辑（保持原视频时长/比例）</option>
@@ -72,7 +76,7 @@
       </div>
 
       <button id="generate">开始生成</button>
-      <div class="hint">API Key 只存储在 Vercel Environment Variables 中，不会发送到浏览器。</div>
+      <div class="hint">刷新或关闭页面后需要重新输入 API Key。</div>
     </section>
 
     <section class="card">
@@ -107,7 +111,10 @@ mode.dispatchEvent(new Event("change"));
 
 function setStatus(text) { statusBox.textContent = text; }
 
-async function jsonFetch(url, options) {
+async function jsonFetch(url, options = {}) {
+  const apiKey = document.getElementById("apiKey").value.trim();
+  if (!apiKey) throw new Error("请输入 ARK API Key。");
+  options.headers = Object.assign({}, options.headers || {}, {"X-Ark-Api-Key": apiKey});
   const res = await fetch(url, options);
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || JSON.stringify(data));

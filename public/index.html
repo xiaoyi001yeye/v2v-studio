@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>V2V Studio</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin:0; background:#0b0d12; color:#eef1f6; }
+    .wrap { max-width:1100px; margin:0 auto; padding:36px 20px 60px; }
+    h1 { margin:0 0 6px; font-size:32px; }
+    .sub { color:#98a2b3; margin-bottom:28px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+    .card { background:#141821; border:1px solid #262c38; border-radius:16px; padding:20px; }
+    label { display:block; margin:14px 0 7px; font-size:14px; color:#cbd2dc; }
+    input, textarea, select { width:100%; box-sizing:border-box; background:#0d1118; color:#fff; border:1px solid #303746; border-radius:9px; padding:11px 12px; }
+    textarea { min-height:180px; resize:vertical; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .checks { display:flex; gap:24px; margin:16px 0; }
+    .checks label { margin:0; display:flex; align-items:center; gap:8px; }
+    .checks input { width:auto; }
+    button { width:100%; border:0; border-radius:10px; padding:13px; font-weight:700; background:#fff; color:#111; cursor:pointer; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    #status { min-height:120px; white-space:pre-wrap; background:#0d1118; border-radius:10px; padding:14px; color:#aeb8c8; }
+    video { width:100%; margin-top:16px; border-radius:12px; background:#000; min-height:280px; }
+    .hint { color:#7f8a9d; font-size:13px; margin-top:10px; }
+    @media (max-width:800px){ .grid{grid-template-columns:1fr}.row{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>V2V Studio</h1>
+  <div class="sub">Seedance V2V · Vercel + FastAPI</div>
+  <div class="grid">
+    <section class="card">
+      <label>生成模式</label>
+      <select id="mode">
+        <option value="edit">视频编辑（保持原视频时长/比例）</option>
+        <option value="reference">参考视频生成（动作/运镜参考）</option>
+      </select>
+
+      <label>原视频 URL / Asset URI</label>
+      <input id="videoUri" placeholder="https://...mp4 或 asset://asset-xxxx">
+
+      <label>参考图片 URL / Asset URI（可选）</label>
+      <input id="imageUri" placeholder="https://...jpg 或 asset://asset-xxxx">
+
+      <label>提示词</label>
+      <textarea id="prompt">这是视频编辑任务。
+
+请严格保持视频中的人物动作、镜头运动、构图、时序和节奏。
+仅执行我描述的修改，其他内容尽量保持不变。
+不要添加字幕，不要增加无关人物。</textarea>
+
+      <div class="row">
+        <div>
+          <label>宽高比</label>
+          <select id="ratio">
+            <option>adaptive</option><option>16:9</option><option>9:16</option>
+            <option>1:1</option><option>4:3</option><option>3:4</option>
+          </select>
+        </div>
+        <div>
+          <label>时长（秒）</label>
+          <input id="duration" type="number" value="-1">
+        </div>
+      </div>
+
+      <div class="checks">
+        <label><input id="audio" type="checkbox" checked> 生成音频</label>
+        <label><input id="watermark" type="checkbox"> 水印</label>
+      </div>
+
+      <button id="generate">开始生成</button>
+      <div class="hint">API Key 只存储在 Vercel Environment Variables 中，不会发送到浏览器。</div>
+    </section>
+
+    <section class="card">
+      <label>运行状态</label>
+      <div id="status">等待开始。</div>
+      <video id="result" controls playsinline></video>
+    </section>
+  </div>
+</div>
+<script>
+const mode = document.getElementById("mode");
+const ratio = document.getElementById("ratio");
+const duration = document.getElementById("duration");
+const prompt = document.getElementById("prompt");
+const button = document.getElementById("generate");
+const statusBox = document.getElementById("status");
+const result = document.getElementById("result");
+
+const editPrompt = prompt.value;
+const refPrompt = `严格参考视频1中的人物动作、动作顺序、节奏和镜头运动，重新生成一段新视频。
+如果提供了图片1，请保持图片1中主体的身份、外观和服装特征。`;
+
+mode.addEventListener("change", () => {
+  const editing = mode.value === "edit";
+  ratio.value = editing ? "adaptive" : "16:9";
+  duration.value = editing ? -1 : 10;
+  ratio.disabled = editing;
+  duration.disabled = editing;
+  prompt.value = editing ? editPrompt : refPrompt;
+});
+mode.dispatchEvent(new Event("change"));
+
+function setStatus(text) { statusBox.textContent = text; }
+
+async function jsonFetch(url, options) {
+  const res = await fetch(url, options);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+  return data;
+}
+
+async function poll(taskId) {
+  for (;;) {
+    const data = await jsonFetch("/api/status/" + encodeURIComponent(taskId));
+    setStatus("Task ID: " + taskId + "\n状态: " + data.status);
+
+    if (["succeeded","success","completed"].includes(data.status)) {
+      if (data.video_url) {
+        result.src = data.video_url;
+        setStatus("Task ID: " + taskId + "\n状态: 完成");
+      } else {
+        setStatus("任务成功，但没有发现视频 URL。\nTask ID: " + taskId);
+      }
+      return;
+    }
+    if (["failed","cancelled","canceled"].includes(data.status)) {
+      throw new Error(data.error ? JSON.stringify(data.error) : "生成失败");
+    }
+    await new Promise(r => setTimeout(r, 8000));
+  }
+}
+
+button.addEventListener("click", async () => {
+  button.disabled = true;
+  result.removeAttribute("src");
+  try {
+    setStatus("正在创建 Seedance 任务...");
+    const payload = {
+      mode: mode.value,
+      video_uri: document.getElementById("videoUri").value.trim(),
+      image_uri: document.getElementById("imageUri").value.trim() || null,
+      prompt: prompt.value.trim(),
+      ratio: ratio.value,
+      duration: Number(duration.value),
+      generate_audio: document.getElementById("audio").checked,
+      watermark: document.getElementById("watermark").checked
+    };
+    const created = await jsonFetch("/api/create", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    await poll(created.task_id);
+  } catch (e) {
+    setStatus("错误：\n" + e.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

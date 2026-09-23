@@ -8,14 +8,24 @@ import gradio as gr
 from v2v_studio.config import settings
 from v2v_studio.seedance import SeedanceClient, SeedanceError
 
-DEFAULT_EDIT_PROMPT = """这是视频编辑任务。
+PROMPTS = {
+    "文生视频 T2V": "一只银色未来感机器人在雨夜霓虹城市中奔跑，低机位跟拍，电影级灯光，镜头运动流畅，细节丰富。",
+    "图生视频 I2V": "以图片1为主体生成视频。保持主体身份、外观和服装特征稳定，让主体自然行走并看向镜头，电影感运镜，动作自然。",
+    "视频编辑 V2V": """这是视频编辑任务。
 
 请严格保持视频中的人物动作、镜头运动、构图、时序和节奏。
 仅执行我描述的修改，其他内容尽量保持不变。
-不要添加字幕，不要增加无关人物。"""
+不要添加字幕，不要增加无关人物。""",
+    "参考视频生成 R2V": """严格参考视频1中的人物动作、动作顺序、节奏和镜头运动，重新生成一段新视频。
+如果提供了图片1，请保持图片1中主体的身份、外观和服装特征。""",
+}
 
-DEFAULT_REFERENCE_PROMPT = """严格参考视频1中的人物动作、动作顺序、节奏和镜头运动，重新生成一段新视频。
-如果提供了图片1，请保持图片1中主体的身份、外观和服装特征。"""
+MODE_VALUES = {
+    "文生视频 T2V": "text",
+    "图生视频 I2V": "image",
+    "视频编辑 V2V": "edit",
+    "参考视频生成 R2V": "reference",
+}
 
 
 def run_generation(
@@ -30,8 +40,7 @@ def run_generation(
     watermark: bool,
     progress=gr.Progress(track_tqdm=False),
 ):
-    mode = "edit" if mode_label.startswith("视频编辑") else "reference"
-
+    mode = MODE_VALUES[mode_label]
     try:
         progress(0.05, desc="检查配置")
         client = SeedanceClient(api_key=api_key)
@@ -39,9 +48,9 @@ def run_generation(
         progress(0.10, desc="创建 Seedance 任务")
         task_id = client.create_task(
             prompt=prompt,
-            video_uri=video_uri,
-            image_uri=image_uri or None,
             mode=mode,
+            video_uri=video_uri or None,
+            image_uri=image_uri or None,
             ratio=ratio,
             duration=int(duration),
             generate_audio=generate_audio,
@@ -60,9 +69,7 @@ def run_generation(
         progress(0.85, desc="获取生成视频")
         video_url = client.find_video_url(result)
         if not video_url:
-            raise SeedanceError(
-                "任务已成功，但响应中未找到可下载的视频 URL。完整响应已保存到 data/ 目录。"
-            )
+            raise SeedanceError("任务已成功，但响应中未找到可下载的视频 URL。")
 
         output_path = client.download_video(video_url, task_id)
         progress(1.0, desc="完成")
@@ -70,19 +77,20 @@ def run_generation(
         return str(output_path), "\n".join(status_lines), task_id
 
     except Exception as exc:
-        if isinstance(exc, SeedanceError):
-            message = str(exc)
-        else:
-            message = f"{type(exc).__name__}: {exc}"
+        message = str(exc) if isinstance(exc, SeedanceError) else f"{type(exc).__name__}: {exc}"
         return None, f"生成失败：\n{message}\n\n{traceback.format_exc(limit=2)}", ""
 
 
 def update_mode(mode_label: str):
-    editing = mode_label.startswith("视频编辑")
+    editing = mode_label == "视频编辑 V2V"
+    image_visible = mode_label in {"图生视频 I2V", "参考视频生成 R2V"}
+    video_visible = mode_label in {"视频编辑 V2V", "参考视频生成 R2V"}
     return (
+        gr.update(visible=video_visible),
+        gr.update(visible=image_visible),
         gr.update(interactive=not editing, value="adaptive" if editing else "16:9"),
         gr.update(interactive=not editing, value=-1 if editing else 10),
-        DEFAULT_EDIT_PROMPT if editing else DEFAULT_REFERENCE_PROMPT,
+        PROMPTS[mode_label],
     )
 
 
@@ -91,9 +99,9 @@ with gr.Blocks(title="V2V Studio") as demo:
         """
 # V2V Studio
 
-本地 Gradio 界面的 Seedance V2V 工具。第一版直接使用 **公开 HTTPS URL** 或 **Ark asset:// URI** 作为素材输入。
+Seedance Studio：支持 **文生视频、图生视频、视频编辑、参考视频生成**。
 
-> API Key 可直接在页面输入，仅在当前请求中使用；也可通过 `.env` / 环境变量作为可选默认值。
+> API Key 可直接在页面输入，仅在当前请求中使用；.env 仅作为可选默认方式。
 """
     )
 
@@ -105,36 +113,36 @@ with gr.Blocks(title="V2V Studio") as demo:
                 placeholder="输入你的火山方舟 API Key",
             )
             mode = gr.Radio(
-                ["视频编辑（保持原视频时长/比例）", "参考视频生成（动作/运镜参考）"],
-                value="视频编辑（保持原视频时长/比例）",
+                list(MODE_VALUES.keys()),
+                value="文生视频 T2V",
                 label="生成模式",
             )
             video_uri = gr.Textbox(
                 label="原视频 URL / Asset URI",
                 placeholder="https://example.com/source.mp4 或 asset://asset-xxxx",
+                visible=False,
             )
             image_uri = gr.Textbox(
-                label="参考图片 URL / Asset URI（可选）",
+                label="图片 URL / Asset URI",
                 placeholder="https://example.com/character.jpg 或 asset://asset-xxxx",
+                visible=False,
             )
             prompt = gr.Textbox(
                 label="提示词",
-                value=DEFAULT_EDIT_PROMPT,
+                value=PROMPTS["文生视频 T2V"],
                 lines=12,
             )
 
             with gr.Row():
                 ratio = gr.Dropdown(
-                    ["adaptive", "16:9", "9:16", "1:1", "4:3", "3:4"],
-                    value="adaptive",
+                    ["16:9", "9:16", "1:1", "4:3", "3:4", "adaptive"],
+                    value="16:9",
                     label="宽高比",
-                    interactive=False,
                 )
                 duration = gr.Number(
-                    value=-1,
+                    value=10,
                     precision=0,
                     label="时长（秒）",
-                    interactive=False,
                 )
 
             with gr.Row():
@@ -148,14 +156,12 @@ with gr.Blocks(title="V2V Studio") as demo:
             task_id = gr.Textbox(label="Task ID", interactive=False)
             status = gr.Textbox(label="运行状态", lines=12, interactive=False)
 
-    gr.Markdown(
-        f"当前模型：`{settings.model}`  ·  Ark Endpoint：`{settings.base_url}`"
-    )
+    gr.Markdown(f"当前模型：{settings.model}  ·  Ark Endpoint：{settings.base_url}")
 
     mode.change(
         fn=update_mode,
         inputs=mode,
-        outputs=[ratio, duration, prompt],
+        outputs=[video_uri, image_uri, ratio, duration, prompt],
     )
 
     generate.click(

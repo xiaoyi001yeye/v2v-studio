@@ -1,13 +1,13 @@
 # V2V Studio
 
-A lightweight local Gradio studio for video-to-video generation and editing with Volcengine Ark / Doubao Seedance.
+A lightweight Seedance studio for text-to-video, image-to-video, video editing and reference-video generation with Volcengine Ark.
 
 > Status: first MVP.
 
 ## Features
 
 - Python + Gradio, no separate frontend required.
-- Seedance 2.5 V2V editing and reference-video generation.
+- Four generation modes: T2V, I2V, V2V editing and reference-video generation.
 - Supports public HTTPS URLs and Ark `asset://...` references.
 - Polls asynchronous generation tasks until completion.
 - Downloads generated videos into `outputs/`.
@@ -70,7 +70,15 @@ POLL_INTERVAL_SECONDS=10
 TASK_TIMEOUT_SECONDS=3600
 ```
 
-## V2V modes
+## Generation modes
+
+### Text-to-video
+
+Generate a video from prompt only. No source video is required.
+
+### Image-to-video
+
+Generate a video from an image plus prompt.
 
 ### Video editing
 

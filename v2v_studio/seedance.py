@@ -32,7 +32,7 @@ class SeedanceClient:
         )
 
     @staticmethod
-    def _validate_remote_uri(value: str, label: str) -> str:
+    def _validate_remote_uri(value: str | None, label: str) -> str:
         value = (value or "").strip()
         if not value:
             raise SeedanceError(f"{label} is required.")
@@ -46,9 +46,9 @@ class SeedanceClient:
         self,
         *,
         prompt: str,
-        video_uri: str,
+        mode: str = "text",
+        video_uri: str | None = None,
         image_uri: str | None = None,
-        mode: str = "edit",
         ratio: str = "16:9",
         duration: int = 10,
         generate_audio: bool = True,
@@ -58,11 +58,13 @@ class SeedanceClient:
         if not prompt:
             raise SeedanceError("Prompt is required.")
 
-        video_uri = self._validate_remote_uri(video_uri, "Video URI")
+        if mode not in {"text", "image", "edit", "reference"}:
+            raise SeedanceError(f"Unsupported generation mode: {mode}")
+
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
 
-        if image_uri and image_uri.strip():
-            image_uri = self._validate_remote_uri(image_uri, "Reference image URI")
+        if mode == "image":
+            image_uri = self._validate_remote_uri(image_uri, "Image URI")
             content.append(
                 {
                     "type": "image_url",
@@ -71,13 +73,34 @@ class SeedanceClient:
                 }
             )
 
-        content.append(
-            {
-                "type": "video_url",
-                "video_url": {"url": video_uri},
-                "role": "reference_video",
-            }
-        )
+        elif mode == "edit":
+            video_uri = self._validate_remote_uri(video_uri, "Video URI")
+            content.append(
+                {
+                    "type": "video_url",
+                    "video_url": {"url": video_uri},
+                    "role": "reference_video",
+                }
+            )
+
+        elif mode == "reference":
+            video_uri = self._validate_remote_uri(video_uri, "Video URI")
+            if image_uri and image_uri.strip():
+                image_uri = self._validate_remote_uri(image_uri, "Reference image URI")
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": image_uri},
+                        "role": "reference_image",
+                    }
+                )
+            content.append(
+                {
+                    "type": "video_url",
+                    "video_url": {"url": video_uri},
+                    "role": "reference_video",
+                }
+            )
 
         payload: dict[str, Any] = {
             "model": settings.model,

@@ -11,7 +11,7 @@ A lightweight local Gradio studio for video-to-video generation and editing with
 - Supports public HTTPS URLs and Ark `asset://...` references.
 - Polls asynchronous generation tasks until completion.
 - Downloads generated videos into `outputs/`.
-- Keeps secrets in `.env` (never commit your API key).
+- Lets you enter the Ark API key directly in the UI; `.env` is optional.
 - All code, dependencies (virtualenv), local data and outputs can live under this single project directory.
 
 ## Requirements
@@ -24,20 +24,18 @@ A lightweight local Gradio studio for video-to-video generation and editing with
 ### Windows
 
 ```powershell
-copy .env.example .env
-# Edit .env and set ARK_API_KEY
 setup.bat
 start.bat
+# Enter ARK API Key in the page
 ```
 
 ### macOS / Linux
 
 ```bash
-cp .env.example .env
-# Edit .env and set ARK_API_KEY
 chmod +x setup.sh start.sh
 ./setup.sh
 ./start.sh
+# Enter ARK API Key in the page
 ```
 
 Open: http://127.0.0.1:7860
@@ -49,22 +47,20 @@ This repository is ready for GitHub Codespaces.
 
 1. Open the repository on GitHub.
 2. Click **Code** -> **Codespaces** -> **Create codespace on main**.
-3. Add a Codespaces secret named `ARK_API_KEY` with your Volcengine Ark API key.
-4. Rebuild/recreate the codespace if the secret was added after creation.
-5. Dependencies are installed automatically.
-6. V2V Studio starts automatically on port `7860`.
-7. GitHub will forward port `7860`; open the forwarded URL to use the Gradio UI.
+3. Dependencies are installed automatically.
+4. V2V Studio starts automatically on port `7860`.
+5. GitHub will forward port `7860`; open the forwarded URL and enter your Ark API key in the page.
 
 Codespaces uses:
 
 - `.devcontainer/devcontainer.json`
 - `.devcontainer/start-codespace.sh`
 
-The API key is read from the Codespaces environment and is never stored in the repository.
+The API key can be entered in the page and is not stored in the repository.
 
 ## Configuration
 
-`.env`:
+Optional `.env` fallback:
 
 ```env
 ARK_API_KEY=

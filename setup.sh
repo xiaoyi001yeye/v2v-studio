@@ -12,8 +12,5 @@ fi
 python -m pip install --upgrade pip
 pip install -r requirements-local.txt
 
-if [ ! -f .env ]; then
-  cp .env.example .env
-fi
 
-echo "Setup complete. Edit .env and set ARK_API_KEY, then run ./start.sh"
+echo "Setup complete. Run ./start.sh and enter ARK API Key in the page."

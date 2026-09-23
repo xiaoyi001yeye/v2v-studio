@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import traceback
 
 import gradio as gr
@@ -170,9 +171,13 @@ with gr.Blocks(title="V2V Studio") as demo:
 if __name__ == "__main__":
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.outputs_dir.mkdir(parents=True, exist_ok=True)
+    server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", os.getenv("PORT", "7860")))
+    inbrowser = os.getenv("GRADIO_INBROWSER", "true").lower() in {"1", "true", "yes"}
+
     demo.queue(default_concurrency_limit=2).launch(
-        server_name="127.0.0.1",
-        server_port=7860,
-        inbrowser=True,
+        server_name=server_name,
+        server_port=server_port,
+        inbrowser=inbrowser,
         show_error=True,
     )

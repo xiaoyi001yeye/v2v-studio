@@ -17,7 +17,7 @@ if not exist .venv (
 call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 if errorlevel 1 goto :error
-pip install -r requirements.txt
+pip install -r requirements-local.txt
 if errorlevel 1 goto :error
 
 if not exist .env copy .env.example .env >nul

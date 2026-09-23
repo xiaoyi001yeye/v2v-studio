@@ -10,7 +10,7 @@ fi
 
 . .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-local.txt
 
 if [ ! -f .env ]; then
   cp .env.example .env

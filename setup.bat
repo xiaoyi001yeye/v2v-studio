@@ -20,11 +20,10 @@ if errorlevel 1 goto :error
 pip install -r requirements-local.txt
 if errorlevel 1 goto :error
 
-if not exist .env copy .env.example .env >nul
 
 echo.
 echo Setup complete.
-echo Edit .env and set ARK_API_KEY, then run start.bat
+echo Run start.bat and enter ARK API Key in the page
 exit /b 0
 
 :error
